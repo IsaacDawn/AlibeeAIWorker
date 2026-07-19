@@ -1,0 +1,10 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@google/genai": "^2.6.0",
+    "axios": "^1.16.1",
+    "dotenv": "^16.6.1",
+    "mysql2": "^3.22.3",
+    "openai": "^4.0.0"
+  }
+}

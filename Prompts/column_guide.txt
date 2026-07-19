@@ -1,0 +1,88 @@
+DB column guide:
+
+product_id:
+Unique AliExpress product ID. Use it only for output identity. Do not use it for marketing copy.
+
+product_title:
+Raw AliExpress title. It is noisy and full of SEO keywords. Use it to understand the product, but never copy it directly.
+
+product_description:
+Raw HTML description from AliExpress. It may contain images, broken English, scripts, and irrelevant HTML. Use it only to extract useful product facts.
+
+first_level_category_name:
+Main AliExpress category. Use it to understand product domain and choose the main category.
+
+second_level_category_name:
+More specific AliExpress category. Use it to understand the product type.
+
+orders:
+Order count or sales indicator. Use it as a popularity signal, but do not exaggerate. Do not say best-seller unless clearly supported.
+
+product_small_image_urls:
+Comma-separated product image URLs. The script sends the first images separately as visual input. Use images to understand color, material appearance, shape, style, and use case.
+
+raw_json:
+Full combined scraper/API data. Use it to find API fields, price, rating, store, category IDs, reviews, specs, product_main_image_url, sale data, etc. Reviews may only be quoted if exact review text exists.
+
+AI output columns saved back to alibee_products:
+
+content_sensitivity_level:
+Mandatory AI output integer from 1 to 5.
+1 = Completely safe general product.
+2 = Regular product with mild fashion, body, beauty, or style context.
+3 = Bold, revealing, or mildly provocative product.
+4 = Lingerie or intimate wearable apparel.
+5 = Highly sensitive special-interest product.
+
+audience_gender_code:
+Mandatory AI output integer from 1 to 5.
+1 = Universal or general audience.
+2 = Male-leaning audience.
+3 = Female-leaning audience.
+4 = Couple, family, or shared home audience.
+5 = Kids, babies, or parents audience.
+
+is_giftable:
+Mandatory AI output integer 0 or 1.
+0 = Not especially giftable.
+1 = Suitable as a gift.
+
+AI insight output saved to alibee_product_ai_insights:
+
+product_insights:
+Mandatory top-level AI output object written in English only.
+It is used internally for Alibee ranking, search, recommendations, personalization, and product understanding.
+Missing product_insights is invalid.
+
+target_audience:
+Mandatory JSON object.
+Fields:
+primary, secondary, age_vibe, style_vibe.
+Use short English values. style_vibe must be a non-empty array of English strings.
+
+purchase_intent:
+Mandatory JSON object.
+Fields:
+main_reason, use_cases, problem_solved.
+Use short English values. use_cases must be a non-empty array of English strings.
+
+marketing_angles:
+Mandatory JSON object.
+Fields:
+main_hook, short_hooks.
+Use short English values. short_hooks must be a non-empty array of English strings.
+
+product_attributes:
+Mandatory JSON object.
+Fields:
+material_guess, color_family, pattern, fit, occasion, season.
+Use short English values.
+Use "unknown" when unclear.
+Use "multiple" for color_family when the product has multiple colors or variants.
+occasion and season must be non-empty arrays of English strings.
+
+english_hashtags:
+JSON array saved in alibee_product_ai_insights.
+Contains exactly 10 English hashtags copied from the English language output.
+Use it for future AI ranking, similarity, recommendations, search expansion, and product understanding.
+Keep it as JSON array, not a single text string, so future workers can parse each tag cleanly.

@@ -1,0 +1,6 @@
+{
+  "temperature": 0.2,
+  "top_p": 0.7,
+  "max_tokens": 2200,
+  "stream": true
+}
