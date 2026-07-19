@@ -1,47 +1,307 @@
-# AlibeePop 🐝
+# AliBee AI Worker
 
-AlibeePop is a companion app for the main **AliBee** platform, designed specifically for affiliates. 
-The app provides a fast, mobile-first, TikTok/Reels-style user interface that allows affiliates to view, filter, and select newly scraped products from AliExpress before they are published to the main audience.
+Background AI worker for enriching AliBee products with multilingual content, categories, product insights, and Gemini-powered analysis.
 
-## How It Works 💡
+## Overview
 
-The application acts as a "triage and curation system" between the raw data gathered by the scraper and the final product database used by the main AliBee app:
+AliBee AI Worker continuously reads unprocessed products from the AliBee MySQL database, sends product data and images to Google Gemini, validates the returned JSON, and saves the enriched content back to the database.
 
-1. **The Feed:** The app fetches products from the scraper's database table (`aliexpress_products`) that have not yet been curated (where `is_selected` is `0` or `NULL`).
-2. **Like ❤️:** When an affiliate likes a product and clicks the Like button, two actions happen simultaneously on the server (wrapped in a single database transaction):
-   - The entire product record (including pricing, images, and video links) is copied to the `alibee_products` table (the primary database for the main AliBee app).
-   - The product is marked as selected in the scraper's table (`is_selected = 1`) so it won't appear in the curation feed again.
-3. **Dislike ❌:** When an affiliate rejects a product, it is simply marked as discarded in the scraper's table (`is_selected = 2`) and is removed from the feed without being transferred to the main database.
+The worker currently generates content in:
 
-## Tech Stack 🛠️
+* English
+* Hebrew
+* Arabic
+* French
+* Spanish
+* Russian
 
-* **Frontend:** * React + TypeScript.
-  * Vite for fast development and building.
-  * `embla-carousel-react` for building the vertical scrolling feed (swiping between products) and horizontal scrolling (swiping through images/videos of a specific product).
-* **Backend:**
-  * PHP scripts communicating with the database via PDO.
-  * MySQL Database (`ovvwhemy_Alibee_DB`) hosted on Bluehost.
+It also assigns AliBee categories, calculates product-level scores, and creates structured marketing and audience insights.
 
-## Backend API Structure 📂
+## Main Features
 
-The frontend communicates with 3 main PHP endpoints on the server:
+* Continuous database polling
+* Batch product processing
+* Multilingual product names and descriptions
+* Ten hashtags per supported language
+* Three-level AliBee category classification
+* Product image analysis
+* Content sensitivity classification
+* Audience and giftability classification
+* Structured product insights
+* Configurable Gemini model and generation settings
+* MySQL database persistence
+* Optional JSON output files
+* JSONL debug logs for complete run analysis
+* Safe recovery from trailing extra JSON closing braces
+* `PROHIBITED_CONTENT` handling
+* Temporary API and image-download error handling
 
-* **`products_feed_paged.php`**: Responsible for fetching the product feed.
-  - Supports pagination (loads 10 products per page).
-  - Includes filters for categories, text search, and a toggle for "video-only" products.
-  - Ensures only uncurated products are fetched (`is_selected IS NULL OR p.is_selected = 0`).
-  - Fetches products in a randomized order (`ORDER BY RAND()`) to keep the discovery experience fresh.
-* **`save_product.php`**: The endpoint triggered by the **Like** action.
-  - Uses an `INSERT IGNORE INTO ... SELECT` query to copy the product data from `aliexpress_products` to `alibee_products`.
-  - Updates the scraper table to set `is_selected = 1`.
-  - Executes everything within a Transaction to ensure data integrity.
-* **`dislike_product.php`**: The endpoint triggered by the **Dislike** action.
-  - Updates the `is_selected` column in the `aliexpress_products` table to `2`.
+## Product Selection
 
-## Local Development 💻
+The worker processes products that match:
 
-The `vite.config.ts` is already configured with a proxy that routes `/alibeepop` requests directly to the remote server, preventing CORS issues during local development. To run the app locally:
+```sql
+WHERE a.ai_processed_at IS NULL
+  AND (a.ai_failed IS NULL OR a.ai_failed = 0)
+```
 
-1. Install all dependencies:
-   ```bash
-   npm install
+Successfully processed products receive an `ai_processed_at` timestamp.
+
+When Gemini blocks a product with `PROHIBITED_CONTENT`:
+
+* A clear message is printed to the console.
+* `ai_failed` is updated to `1`.
+* `ai_processed_at` remains `NULL`.
+* The product is not selected again during normal processing.
+
+## Safe JSON Repair
+
+Gemini occasionally returns a complete JSON object followed by one or more unnecessary closing braces.
+
+Example:
+
+```text
+{
+  "product_id": 123
+}
+}
+```
+
+The worker can safely remove only trailing extra `}` characters when:
+
+* The root JSON object is already complete and balanced.
+* The remaining characters contain only whitespace and extra closing braces.
+* The repaired JSON passes `JSON.parse`.
+* The returned `product_id` matches the product being processed.
+* All required languages and fields pass validation.
+* The database write succeeds.
+
+The worker does not attempt to complete truncated JSON, invent missing data, or extract a nested language object.
+
+## Debug Mode
+
+Enable detailed run logging in `.env`:
+
+```env
+DEBUG_MODE=true
+```
+
+Debug files are written to:
+
+```text
+debug_logs/
+```
+
+Each run creates one JSONL file similar to:
+
+```text
+AI_DEBUG_RUN_2026-07-19T17-49-02-665Z.jsonl
+```
+
+The debug log may include:
+
+* Product ID and original title
+* Cleaned product description
+* Image URLs and image counts
+* Prompt, output, and total token usage
+* Raw Gemini response
+* Parsed and validated JSON
+* JSON repair details
+* Validation errors
+* API and database errors
+* Rows written to the database
+* `ai_processed_at` status
+* `ai_failed` status
+* Final run statistics
+
+Each line is an independent JSON object.
+
+Disable debug logging for normal production runs:
+
+```env
+DEBUG_MODE=false
+```
+
+## Requirements
+
+* Node.js 22 or newer recommended
+* MySQL-compatible database
+* Google Gemini API key
+* Access to the AliBee database
+* Internet access for Gemini requests and product image downloads
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/IsaacDawn/AlibeeAIWorker.git
+cd AlibeeAIWorker
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create the local environment file:
+
+```cmd
+copy .env.example .env
+```
+
+Add the required credentials and settings to `.env`.
+
+Never commit the real `.env` file.
+
+## Environment Configuration
+
+Example:
+
+```env
+GEMINI_API_KEY=
+
+GOOGLE_MODEL=gemini-3.1-flash-lite
+
+DB_HOST=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
+
+SYSTEM_PROMPT_FILE=prompts/system_prompt.txt
+COLUMN_GUIDE_FILE=prompts/column_guide.txt
+
+IMAGE_LIMIT=6
+BATCH_LIMIT=20
+MAX_PRODUCTS_PER_RUN=100
+DB_POLL_INTERVAL_SEC=10
+DELAY_BETWEEN_PRODUCTS_MS=15000
+
+TEMPERATURE=0.6
+TOP_P=0.95
+MAX_OUTPUT_TOKENS=5000
+RESPONSE_MIME_TYPE=application/json
+
+USE_THINKING=false
+USE_GOOGLE_SEARCH=false
+SAVE_JSON_OUTPUT_FILE=true
+COUNT_TOKENS_BEFORE_REQUEST=false
+
+DEBUG_MODE=false
+```
+
+## Running the Worker
+
+Run directly with Node.js:
+
+```bash
+node update_db_ai.js
+```
+
+On Windows, the included command file can also be used:
+
+```cmd
+start_ai.cmd
+```
+
+### Process One Product
+
+To process a specific product ID:
+
+```bash
+node update_db_ai.js 1005005245733077
+```
+
+Single-product mode is useful for testing, debugging, or reprocessing a specific product.
+
+## Project Structure
+
+```text
+AliBeeAIWorker/
+├── prompts/
+│   ├── system_prompt.txt
+│   └── column_guide.txt
+├── model_configs/
+├── update_db_ai.js
+├── start_ai.cmd
+├── package.json
+├── package-lock.json
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+Generated local directories are intentionally excluded from Git:
+
+```text
+node_modules/
+outputs/
+debug_logs/
+.env
+*.log
+GOOGLE_RESULT_*.json
+```
+
+## Output Files
+
+When enabled:
+
+```env
+SAVE_JSON_OUTPUT_FILE=true
+```
+
+Validated Gemini results are written to:
+
+```text
+outputs/
+```
+
+These files are for local inspection and are not committed to Git.
+
+## Error Handling
+
+### Invalid JSON
+
+Invalid or incomplete JSON is rejected and is not written to the database.
+
+### Trailing Extra Closing Braces
+
+A complete JSON object followed only by extra `}` characters may be repaired using the safe repair rules described above.
+
+### `PROHIBITED_CONTENT`
+
+The product is marked:
+
+```text
+ai_failed = 1
+```
+
+The worker continues processing other products.
+
+### Temporary Gemini or Network Errors
+
+Temporary failures such as rate limits, service unavailability, timeouts, or connection errors may be retried according to the configured retry settings.
+
+### Image Download Failure
+
+Products whose required images cannot be downloaded may be temporarily skipped without updating `ai_processed_at`.
+
+## Security
+
+* Never commit `.env`.
+* Never commit API keys or database credentials.
+* Use `.env.example` only as a configuration template.
+* Rotate credentials immediately if they are exposed.
+* Prefer secret managers when deploying the worker to a server or cloud environment.
+
+## Notes
+
+This repository contains the background AI processing service for the AliBee product discovery platform.
+
+Related AliBee projects include:
+
+* AliBee
+* AliBeePop
+* AliBeeCollector
+* AliBeeAIWorker
